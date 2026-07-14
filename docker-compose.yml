@@ -1,0 +1,24 @@
+#version: '3.8'
+
+services:
+  qb-slow-queue:
+    build: .
+    container_name: qb-slow-queue
+    restart: unless-stopped
+    environment:
+      # ----- qBittorrent 连接配置（按实际情况修改）-----
+      - QB_HOST=${QB_HOST}      # qBittorrent 的 IP 地址
+      - QB_PORT=${QB_PORT}               # WebUI 端口
+      - QB_USER=${QB_USER}              # 用户名
+      - QB_PASS=${QB_PASS}         # 密码
+      # ----- 运行参数 -----
+      - SPEED_THRESHOLD=${SPEED_THRESHOLD}      # 速度阈值（字节/秒），51200 = 50KB/s
+      - CHECK_INTERVAL=${CHECK_INTERVAL}         # 检查间隔（秒），300 = 5分钟
+      - LOG_LEVEL=${LOG_LEVEL}             # 日志级别: DEBUG/INFO/WARNING/ERROR
+    volumes:
+      # 可选：挂载日志目录（便于持久化查看日志）
+      - ./logs:/app/logs
+    # 如果 qBittorrent 和本容器不在同一网络，需要确保网络互通
+    # 如果都在飞牛 Docker 的同一 bridge 网络，可直接用 IP 访问
+    # 建议创建外部网络或使用 host 模式（见下方注释）
+    # network_mode: host  # 取消注释可使用 host 网络模式

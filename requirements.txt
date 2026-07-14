@@ -1,0 +1,3 @@
+qbittorrent-api>=2024.5.62
+schedule>=1.2.0
+python-dotenv>=1.0.0
