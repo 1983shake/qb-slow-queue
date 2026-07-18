@@ -3,7 +3,7 @@
 services:
   qb-slow-queue:
     #build: .
-    image: crpi-1tmphkb8hkeahev6.cn-chengdu.personal.cr.aliyuncs.com/1983shake/qb-slow-queue:1.0.0
+    image: crpi-1tmphkb8hkeahev6.cn-chengdu.personal.cr.aliyuncs.com/1983shake/qb-slow-queue:1.1.0
     container_name: qb-slow-queue
     restart: unless-stopped
     environment:
