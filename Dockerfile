@@ -3,17 +3,14 @@ FROM python:3.11-slim
 # 设置工作目录
 WORKDIR /app
 
-# 安装依赖
-# 构建环境可能无法直连 pypi.org（如 CNB / 受限网络），改用国内镜像拉取依赖。
-# 如所用构建网络对这两个镜像也不可达，请将下方地址替换为可用镜像（如阿里云/华为云 PyPI 镜像）。
+# 安装依赖（容错源链：先原链接 pypi.org，失败再退回国内镜像）
+# 构建环境可能无法直连 pypi.org（如 CNB / 受限网络）。
+# 策略：默认源优先，失败后依次尝试腾讯云、清华、阿里云镜像，任一成功即停。
 COPY requirements.txt .
-RUN printf '%s\n' \
-        '[global]' \
-        'index-url = https://mirrors.cloud.tencent.com/pypi/simple' \
-        'extra-index-url = https://pypi.tuna.tsinghua.edu.cn/simple' \
-        'trusted-host = mirrors.cloud.tencent.com pypi.tuna.tsinghua.edu.cn' \
-    > /etc/pip.conf && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --retries 2 --timeout 30 -r requirements.txt \
+    || pip install --no-cache-dir --retries 2 --timeout 30 -r requirements.txt -i https://mirrors.cloud.tencent.com/pypi/simple \
+    || pip install --no-cache-dir --retries 2 --timeout 30 -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple \
+    || pip install --no-cache-dir --retries 2 --timeout 30 -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 
 # 复制脚本与版本包
 COPY app.py .

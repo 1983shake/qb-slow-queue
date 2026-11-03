@@ -20,7 +20,7 @@
 - **`__init__.py` 版本体系**：版本唯一来源 `qbslowqueue/__init__.py`（`__version__` / `__release_status__` / `__test_sequence__` / `__docker_tag__`），Docker tag、Compose 镜像名均由其派生。
 - **构建脚本** `build.sh` / `build.ps1`：从 `__init__.py` 派生镜像 tag 并构建启动。
 - **交付前校验** `verify_release.py`：校验 `__init__.py` ↔ `Dockerfile` ↔ `docker-compose.yml` 版本一致性。
-- **国内 PyPI 镜像**：`Dockerfile` 内置腾讯云 + 清华 PyPI 镜像（`/etc/pip.conf`），规避构建网络无法直连 `pypi.org` 的问题。
+- **PyPI 容错源链**：`Dockerfile` 安装依赖时先走原链接 `pypi.org`，失败自动退回腾讯云、清华、阿里云 PyPI 镜像，任一成功即停，规避构建网络无法直连 `pypi.org` 的问题。
 - **README「运行逻辑」章节**：启动流程、单次扫描 Mermaid 流程图、判定与移动规则、定时循环。
 
 ### 变更

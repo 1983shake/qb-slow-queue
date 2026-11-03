@@ -1,6 +1,6 @@
 ## 功能简介
 - 每隔 `CHECK_INTERVAL` 秒检查 qBittorrent 中每个正在下载（downloading/stalledDL）任务的速度。
-- **即时慢速移动**：每次扫描时，凡是当前下载速度低于 `SPEED_THRESHOLD` 的任务，立即移至队列末尾等待（已合并原 `SLOW_DURATION`，不再做"持续观察窗口"判定，避免瞬时波动误移靠间隔节奏控制）。
+- **即时慢速移动**：每次扫描时，凡是当前下载速度低于 `SPEED_THRESHOLD` 的任务，立即移至队列末尾等待。
 - 仅当存在 queuedDL（排队等待）任务时才执行调整。
 - 支持 docker compose 部署
 - qBittorrent（需启用 WebUI API Key 认证，≥5.2.0）
@@ -59,7 +59,7 @@ Docker 镜像 tag、Compose 镜像名均由它派生，禁止在别处另设版�
    - Windows（PowerShell）：`pwsh build.ps1`
 4. 查看日志：`docker logs qb-slow-queue`。
 
-> 构建时若 `pip` 无法连接 `pypi.org`（`Network is unreachable` 等），`Dockerfile` 已内置腾讯云 + 清华 PyPI 镜像（`/etc/pip.conf`）。若所用构建网络对这两个镜像也不可达，请将 `Dockerfile` 中 `pip.conf` 的地址替换为可用镜像（如阿里云 / 华为云 PyPI 镜像）。
+> 构建时 `Dockerfile` 采用**容错源链**拉取依赖：先走原链接 `pypi.org`，失败自动退回腾讯云、清华、阿里云 PyPI 镜像，任一成功即停。若所用构建网络对四者均不可达（真·无外网），需离线安装：在有网机器 `pip download -d wheels -r requirements.txt`，把 `wheels/` 拷入镜像后 `pip install --no-index --find-links=/wheels -r requirements.txt`。
 
 ## .env 配置项
 | 配置项 | 说明 | 默认值 |
