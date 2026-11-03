@@ -9,7 +9,7 @@
 `__version__` / `__release_status__` / `__test_sequence__` / `__docker_tag__`。
 Docker 镜像 tag、Compose 镜像名均由它派生，禁止在别处另设版本号。
 
-当前为 **正式版 V1.0.0**（formal），`__test_sequence__` 归 0，镜像 tag 为干净标签（无 `-test.N` 标识）。
+当前为 **正式版 V1.2.0**（formal），`__test_sequence__` 归 0，镜像 tag 为干净标签（无 `-test.N` 标识）。
 镜像地址：`docker.cnb.cool/1983shake/qb-slow-queue:latest`（由 `__init__.py` 派生）。
 
 ## 部署步骤
