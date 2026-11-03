@@ -1,5 +1,4 @@
 # qbittorrent-api 需 >=2026.5.3：该版本起支持 WebUI API Key 认证（api_key 参数，对应 qBittorrent ≥5.2.0）
 # 注意：2026.5.3 起最低 Python 要求为 3.10（Dockerfile 使用 python:3.11-slim，满足）
 qbittorrent-api>=2026.5.3
-schedule>=1.2.0
 python-dotenv>=1.0.0

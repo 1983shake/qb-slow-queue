@@ -1,7 +1,7 @@
 services:
   qb-slow-queue:
     # 镜像 tag 由 qbslowqueue/__init__.py 的 __docker_tag__ 派生，构建前通过环境变量注入。
-    # 兜底默认值与 __init__.py 的 __docker_tag__ 保持一致，未注入 QB_IMAGE_TAG 时仍指向 CNB 仓库。
+    # 兜底默认值与 __init__.py 的 __docker_tag__ 保持一致，未注入 QB_IMAGE_TAG 时仍指向同一镜像。
     image: ${QB_IMAGE_TAG:-docker.cnb.cool/1983shake/qb-slow-queue:latest}
     build:
       context: .
@@ -14,7 +14,7 @@ services:
       - QB_API_KEY=${QB_API_KEY}    # WebUI API Key（WebUI → 选项 → WebUI → 认证 → API Key）
       # ----- 运行参数 -----
       - SPEED_THRESHOLD=${SPEED_THRESHOLD}   # 速度阈值（字节/秒），51200 = 50KB/s
-      - CHECK_INTERVAL=${CHECK_INTERVAL}    # 检查间隔（秒），300 = 5分钟
+      - CHECK_INTERVAL=${CHECK_INTERVAL}    # 检查间隔（秒），300 = 5分钟；每次扫描即时移动低于阈值的任务
       - LOG_LEVEL=${LOG_LEVEL}              # 日志级别: DEBUG/INFO/WARNING/ERROR
     volumes:
       # 可选：挂载日志目录（便于持久化查看日志）
