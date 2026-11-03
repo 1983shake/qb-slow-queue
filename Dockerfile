@@ -16,6 +16,17 @@ RUN pip install --no-cache-dir --retries 2 --timeout 30 -r requirements.txt \
 COPY app.py .
 COPY qbslowqueue ./qbslowqueue
 
+# 时区：镜像默认 Asia/Shanghai，运行时可被 docker-compose 的 TZ 环境变量覆盖。
+# 注意：ARG 必须在引用 $TZ 之前声明，否则 ln -snf 会指向不存在的路径，
+# /etc/localtime 落空 → 容器内仍是 UTC，日志时间与本地差 8 小时。
+ARG TZ=Asia/Shanghai
+ENV TZ=${TZ}
+
+# 安装时区数据并写入系统时区（解决容器内时间与宿主机差 8 小时的问题）
+RUN apt-get update && apt-get install -y --no-install-recommends tzdata && \
+    ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # 创建非 root 用户运行（提升安全性）
 RUN useradd -m -u 1000 qbuser && chown -R qbuser:qbuser /app
 USER qbuser

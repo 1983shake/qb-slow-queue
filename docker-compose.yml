@@ -8,6 +8,10 @@ services:
     container_name: qb-slow-queue
     restart: unless-stopped
     environment:
+      # ----- 时区配置（解决日志时间差 8 小时）-----
+      # 镜像已内置 Asia/Shanghai，此处可覆盖为其它时区（如 Asia/Tokyo）。
+      # 注意：修改后必须 docker compose up -d --force-recreate 才会生效。
+      - TZ=${TZ:-Asia/Shanghai}
       # ----- qBittorrent 连接配置（按实际情况修改）-----
       - QB_HOST=${QB_HOST}          # qBittorrent 的 IP 地址
       - QB_PORT=${QB_PORT}          # WebUI 端口

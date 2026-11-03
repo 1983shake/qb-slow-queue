@@ -30,6 +30,14 @@ except ImportError:  # 未以包形式安装时降级，避免崩溃
 # ---------- 加载 .env ----------
 load_dotenv()
 
+# ---------- 时区 ----------
+# 日志时间必须与宿主机本地时间一致。容器内 /etc/localtime 由镜像 TZ 决定，
+# 这里再显式设置一次，兼容「只改环境变量 TZ、镜像未重建」的场景。
+TZ = os.getenv("TZ", "Asia/Shanghai")
+os.environ["TZ"] = TZ
+if hasattr(time, "tzset"):
+    time.tzset()
+
 # ---------- 日志配置 ----------
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_DIR = "/app/logs"
@@ -65,7 +73,8 @@ file_handler = RotatingFileHandler(
 )
 file_handler.setLevel(getattr(logging, LOG_LEVEL))
 file_formatter = logging.Formatter(
-    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
 file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)

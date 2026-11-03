@@ -11,6 +11,23 @@
 
 ---
 
+## [1.3.1] - 2026-11-03 - 正式版（formal）
+
+> 本版由测试版 #1 转正而来。测试版 #1 的时区链路复核与排障文档升级已整理并入本条，仅保留净结果。
+
+### 修复
+- **Docker 部署后日志时间与本地差 8 小时**：`Dockerfile` 在 `ARG TZ` 未声明前就引用 `$TZ`，`ln -snf /usr/share/zoneinfo/$TZ` 指向空路径，`/etc/localtime` 落空，容器内仍为 UTC。现新增 `ARG TZ=Asia/Shanghai` + `ENV TZ`，并改用 `${TZ}` 展开，镜像默认即为东八区。
+
+### 新增
+- **`app.py` 启动时区兜底**：读取 `TZ`（默认 `Asia/Shanghai`）并调用 `time.tzset()`，兼容「只改环境变量、镜像未重建」的场景；文件日志 formatter 补 `datefmt="%Y-%m-%d %H:%M:%S"`，与控制台格式一致。
+- **`sample.env` / README 新增 `TZ` 配置项**：说明默认值、修改后需 `--force-recreate` 重建容器。
+- **README 时区排障三步定位法**：① `docker exec qb-slow-queue date`（期望 `CST +0800`）② `printenv TZ`（期望 `Asia/Shanghai`）③ `docker compose down && docker compose up -d --build` 重建容器；并给出判定分支——TZ 有值但时间仍错说明镜像内 `/etc/localtime` 未写入，需 `--build` 重建镜像。
+
+### 变更
+- **`docker-compose.yml` 时区项**：`TZ=Asia/Shanghai` 改为 `TZ=${TZ:-Asia/Shanghai}`，支持从 `.env` 覆盖，未配置时回退默认值。
+
+---
+
 ## [1.3.0] - 2026-11-03 - 正式版（formal）
 
 > 本版由测试版 #3 转正而来。测试版 #2（持续慢速判定）、#3（合并参数、降消耗）的过程记录已整理并入本条，仅保留净结果。

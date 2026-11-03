@@ -46,7 +46,7 @@ flowchart TD
 `__version__` / `__release_status__` / `__test_sequence__` / `__docker_tag__`。
 Docker 镜像 tag、Compose 镜像名均由它派生，禁止在别处另设版本号。
 
-当前为 **正式版 V1.3.0**（formal），`__test_sequence__` 归 0，镜像 tag 为干净标签 `:latest`（无 `-test.N` 标识）。
+当前为 **正式版 V1.3.1**（formal），`__test_sequence__` 归 0，镜像 tag 为干净标签 `:latest`（无 `-test.N` 标识）。
 镜像地址：`docker.cnb.cool/1983shake/qb-slow-queue:latest`（由 `__init__.py` 派生）。
 
 > 每次变更（含测试版迭代、测试版转正式版的过程总结）记录在 [`CHANGELOG.md`](CHANGELOG.md)。
@@ -70,6 +70,18 @@ Docker 镜像 tag、Compose 镜像名均由它派生，禁止在别处另设版�
 | SPEED_THRESHOLD | 速度阈值（字节/秒），0 表示仅移动无速度任务 | 51200 |
 | CHECK_INTERVAL | 检查间隔（秒）；每次扫描即时移动低于阈值的任务 | 300 |
 | LOG_LEVEL | 日志级别: DEBUG/INFO/WARNING/ERROR | INFO |
+| TZ | 容器时区，决定日志时间；改后需 `--force-recreate` 重建容器 | Asia/Shanghai |
+
+> **日志时间与本地差 8 小时？** 镜像已内置 `Asia/Shanghai` 时区（`Dockerfile` 中 `ARG TZ` + `tzdata` + `/etc/localtime`），`app.py` 启动时也会按 `TZ` 调用 `time.tzset()` 兜底。若仍为 UTC，按顺序排查：
+> ```bash
+> # 1) 确认容器内时间
+> docker exec qb-slow-queue date          # 期望：CST +0800
+> # 2) 确认容器实际拿到的 TZ
+> docker exec qb-slow-queue printenv TZ   # 期望：Asia/Shanghai
+> # 3) 旧镜像/旧配置启动的容器不会自动生效，必须重建
+> docker compose down && docker compose up -d --build
+> ```
+> 若第 1 步仍是 UTC 而第 2 步为空，说明容器由旧镜像启动或 compose 未传 `TZ`，重建即可；若第 2 步有值而第 1 步仍错，说明镜像内 `/etc/localtime` 未写入，需重建镜像（`--build`）。
 
 ## 交付前校验
 ```bash

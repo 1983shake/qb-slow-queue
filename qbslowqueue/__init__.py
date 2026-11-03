@@ -10,7 +10,7 @@
 - __docker_tag__     : 完整镜像引用，测试版含 -test.N 标识，正式版为干净标签
 """
 
-__version__ = "1.3.0"
+__version__ = "1.3.1"
 __release_status__ = "formal"  # test 或 formal
 __test_sequence__ = 0  # 测试版递增；正式版归 0
 __docker_tag__ = "docker.cnb.cool/1983shake/qb-slow-queue:latest"
