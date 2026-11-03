@@ -1,0 +1,165 @@
+# ============================================================================
+# GitHub Actions：同步 GitHub -> CNB
+# ============================================================================
+name: Sync to CNB and Create Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['release-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CNB_REPO: cnb.cool/1983shake/qb-slow-queue.git
+  CNB_TOKEN_SECRET_NAME: GIT_PASSWORD
+  CNB_API_ENDPOINT: https://api.cnb.cool
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git and CNB remote
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git remote remove cnb 2>/dev/null || true
+          git remote add cnb \
+            "https://cnb:${{ secrets[env.CNB_TOKEN_SECRET_NAME] }}@${{ env.CNB_REPO }}"
+
+      - name: Extract version and project name from tag
+        id: version
+        if: startsWith(github.ref, 'refs/tags/release-v')
+        run: |
+          VERSION="${GITHUB_REF_NAME#release-v}"
+          PROJECT_NAME="${GITHUB_REPOSITORY##*/}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "PROJECT_NAME=${PROJECT_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Push main branch to CNB (auto-merge + retry)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -e
+          echo "==> 同步 main 到 CNB"
+
+          for i in 1 2 3 4 5; do
+            echo "------ 第 ${i} 次尝试 ------"
+            git fetch cnb main || true
+
+            if git rev-parse --verify cnb/main >/dev/null 2>&1; then
+              if git diff --quiet HEAD cnb/main; then
+                echo "✅ GitHub 与 CNB 内容一致，无需同步"
+                exit 0
+              fi
+
+              echo "==> 合并 CNB 上的独有改动（冲突时 GitHub 优先）..."
+              if ! git merge --no-edit -X ours cnb/main; then
+                echo "⚠️ 合并异常，放弃合并，直接用 GitHub 覆盖 CNB"
+                git merge --abort 2>/dev/null || true
+              fi
+            fi
+
+            echo "==> 推送至 CNB..."
+            if git push cnb HEAD:main --force; then
+              echo "✅ 推送成功"
+              exit 0
+            fi
+
+            echo "⚠️ 推送失败，${i} 秒后重试..."
+            sleep "$i"
+          done
+          echo "❌ 推送失败"
+          exit 1
+
+      - name: Fetch CNB Release description
+        id: cnb_release
+        if: startsWith(github.ref, 'refs/tags/release-v')
+        env:
+          CNB_TOKEN: ${{ secrets[env.CNB_TOKEN_SECRET_NAME] }}
+        run: |
+          set -e
+          TAG_NAME="${GITHUB_REF_NAME}"
+          CNB_REPO_SLUG="${CNB_REPO#cnb.cool/}"
+          CNB_REPO_SLUG="${CNB_REPO_SLUG%.git}"
+          URL="${CNB_API_ENDPOINT}/${CNB_REPO_SLUG}/-/releases"
+
+          BODY=""
+          for i in 1 2 3 4 5; do
+            CODE="$(curl -sS -o /tmp/cnb-releases.json -w '%{http_code}' \
+              -H "Authorization: Bearer ${CNB_TOKEN}" -H "accept: application/json" \
+              "${URL}" || echo 000)"
+            echo "==> 第 ${i} 次 CNB API HTTP: ${CODE}"
+
+            if [ "${CODE}" = "200" ]; then
+              if command -v jq >/dev/null 2>&1; then
+                BODY="$(jq -r --arg tag "${TAG_NAME}" '
+                  (if type=="array" then . else (.releases // []) end)
+                  | map(select((.tag_name // .tag) == $tag))
+                  | (.[0] // {})
+                  | ([.body, .description, .desc, .notes] | map(select(. != null and . != "")) | .[0] // "")
+                ' /tmp/cnb-releases.json)"
+              fi
+              if [ -n "${BODY}" ]; then break; fi
+            fi
+            sleep "$i"
+          done
+
+          {
+            echo "body<<__CNB_BODY_EOF__"
+            printf '%s\n' "${BODY}"
+            echo "__CNB_BODY_EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        id: gh_release
+        if: startsWith(github.ref, 'refs/tags/release-v')
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ steps.version.outputs.PROJECT_NAME }}_V${{ steps.version.outputs.VERSION }}
+          body: ${{ steps.cnb_release.outputs.body }}
+          generate_release_notes: ${{ steps.cnb_release.outputs.body == '' }}
+          overwrite_files: true
+
+      # ----------------------------------------------------------------------
+      # 步骤 7：同步 tag 到 CNB
+      #   ⚠️ 优化：只要 CNB 存在该 tag，直接跳过，不再比对 commit
+      # ----------------------------------------------------------------------
+      - name: Push tag to CNB
+        if: startsWith(github.ref, 'refs/tags/release-v')
+        run: |
+          echo "==> 同步 tag ${GITHUB_REF_NAME} 到 CNB"
+
+          # ---- 优化后的防死循环逻辑：存在即跳过 ----
+          REMOTE_TAG_INFO=$(git ls-remote cnb "refs/tags/${GITHUB_REF_NAME}" 2>/dev/null || true)
+          if [ -n "${REMOTE_TAG_INFO}" ]; then
+            echo "✅ CNB 已存在同名 tag，跳过同步（防死循环生效，不再比对 commit）"
+            exit 0
+          fi
+          # ----------------------------------------
+
+          echo "==> 开始推送 tag 到 CNB..."
+          for i in 1 2 3 4 5; do
+            if git push cnb \
+              "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}" --force; then
+              echo "✅ tag 推送成功"
+              exit 0
+            fi
+            echo "⚠️ tag 推送失败，${i} 秒后重试..."
+            sleep "$i"
+          done
+          echo "❌ tag 推送失败"
+          exit 1

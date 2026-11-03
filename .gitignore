@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ====================== 本地过程 / 临时数据（不上传） ======================
+# WorkBuddy 在本机的 Agent 工作态与记忆目录（含本机专属数据，非源码、非缓存）
+.workbuddy/
+
+# 操作系统临时/索引文件
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 本地构建/compose 过程产物（如有）
+.dockerignore.bak
+*.bak
+*~

@@ -3,17 +3,29 @@
 qBittorrent 慢速下载任务自动调整脚本
 功能：定期检查 downloading 和 stalledDL 状态的任务，将速度低于阈值的移至队列末尾
 条件：仅当存在 queuedDL 任务时才执行调整
+认证：使用 qBittorrent WebUI API Key（qBittorrent ≥5.2.0），不再使用用户名/密码
 日志：同时输出到控制台（docker logs）和文件（挂载卷 /app/logs/app.log）
 """
 
 import os
+import sys
 import time
 import logging
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 import schedule
 import qbittorrentapi
 from dotenv import load_dotenv
+
+# 允许从任意工作目录运行（docker 中 cwd=/app，包在 /app/qbslowqueue）
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+try:
+    from qbslowqueue import __version__, __release_status__
+except ImportError:  # 未以包形式安装时降级，避免崩溃
+    __version__ = "unknown"
+    __release_status__ = "unknown"
 
 # ---------- 加载 .env ----------
 load_dotenv()
@@ -61,8 +73,7 @@ logger.addHandler(file_handler)
 # ---------- 配置参数 ----------
 QB_HOST = os.getenv("QB_HOST", "192.168.1.100")
 QB_PORT = int(os.getenv("QB_PORT", 8080))
-QB_USER = os.getenv("QB_USER", "admin")
-QB_PASS = os.getenv("QB_PASS", "adminadmin")
+QB_API_KEY = os.getenv("QB_API_KEY", "")
 
 # 速度阈值（字节/秒），默认 0 表示仅移动完全无速度的任务
 SPEED_THRESHOLD = int(os.getenv("SPEED_THRESHOLD", 0))
@@ -70,20 +81,28 @@ CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", 300))  # 秒
 
 # ---------- 功能函数 ----------
 def connect_qbittorrent():
-    """连接 qBittorrent WebUI"""
+    """连接 qBittorrent WebUI（使用 WebUI API Key 认证，qBittorrent ≥5.2.0）"""
+    if not QB_API_KEY:
+        raise ValueError(
+            "未配置 QB_API_KEY。请在 .env / 环境变量中设置 qBittorrent WebUI 的 API Key"
+            "（WebUI → 选项 → WebUI → 认证 → API Key）。"
+        )
     client = qbittorrentapi.Client(
         host=QB_HOST,
         port=QB_PORT,
-        username=QB_USER,
-        password=QB_PASS,
+        api_key=QB_API_KEY,
     )
     try:
-        client.auth_log_in()
+        # API Key 模式下跳过 cookie 登录，直接发起一次请求验证连通性与鉴权
+        version = client.app.version
         logger.info(f"成功连接到 qBittorrent: {QB_HOST}:{QB_PORT}")
-        logger.info(f"qBittorrent 版本: {client.app.version}")
+        logger.info(f"qBittorrent 版本: {version}")
         return client
-    except qbittorrentapi.LoginFailed as e:
-        logger.error(f"qBittorrent 登录失败: {e}")
+    except qbittorrentapi.APIConnectionError as e:
+        logger.error(f"qBittorrent 连接失败（请检查 QB_HOST/QB_PORT 是否可达）: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"qBittorrent 访问失败（请检查 QB_API_KEY 是否正确）: {e}")
         raise
 
 
@@ -173,11 +192,13 @@ def scan_and_adjust():
 
 
 def main():
+    logger.info(f"qb-slow-queue v{__version__} ({__release_status__})")
     logger.info("🚀 qBittorrent 慢速任务调整服务启动")
     logger.info(f"速度阈值: {SPEED_THRESHOLD/1024:.0f} KB/s (0 表示仅移动无速度任务)")
     logger.info(f"检查间隔: {CHECK_INTERVAL} 秒")
     logger.info("仅处理状态为 'downloading' 或 'stalledDL' 的任务")
     logger.info("条件：仅当存在 'queuedDL' 任务时才执行调整")
+    logger.info("认证方式：WebUI API Key（qBittorrent ≥5.2.0），不使用用户名/密码")
     logger.info(f"日志文件: {LOG_FILE}")
 
     # 启动时立即执行一次
